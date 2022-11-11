@@ -39,6 +39,12 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+configurations.all {
+    exclude("org.slf4j", "slf4j-log4j12")
+    exclude("org.slf4j", "helpers.NOPLoggerFactory")
+    exclude("org.log4j", "log4j")
+}
+
 detekt {
     autoCorrect = true
 }
