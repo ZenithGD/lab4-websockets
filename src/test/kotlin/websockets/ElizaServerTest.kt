@@ -1,18 +1,17 @@
 @file:Suppress("NoWildcardImports")
 package websockets
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import org.mockito.Mockito
+import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.*
-import org.springframework.boot.test.web.server.LocalServerPort
-import java.net.URI
-import java.util.concurrent.CountDownLatch
+import org.springframework.stereotype.Component
 import javax.websocket.*
 
+/*
 @SpringBootTest(webEnvironment = RANDOM_PORT)
+@SpringRabbitTest
 class ElizaServerTest {
 
     private lateinit var container: WebSocketContainer
@@ -70,4 +69,26 @@ class ElizaOnOpenMessageHandlerToComplete(private val list: MutableList<String>,
             session.basicRemote.sendText("maybe")
         }
     }
+}
+*/
+
+const val ELIZA_STOMP_ENDPOINT = "/app/eliza"
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+class ElizaServerTestStomp {
+    private lateinit var rabbitTemplateMock: RabbitTemplate
+    private lateinit var subject: MessageSender
+
+    @BeforeEach
+    fun setUp() {
+        rabbitTemplateMock = Mockito.mock(RabbitTemplate::class.java)
+        subject = MessageSender(rabbitTemplateMock)
+    }
+}
+
+@Component
+class MessageSender(private val rabbitTemplate: RabbitTemplate) {
+    fun send(message: String) {
+        rabbitTemplate.convertAndSend(ELIZA_STOMP_ENDPOINT, message)
+    }
+
 }
