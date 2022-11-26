@@ -56,7 +56,7 @@ class ElizaController(
     fun onSubscribeEvent(sessionSubscribeEvent: SessionSubscribeEvent) {
 
         val headerAccessor = StompHeaderAccessor.wrap(sessionSubscribeEvent.message)
-        LOGGER.info("User with ID ${headerAccessor.sessionId} connected.")
+        LOGGER.info("User with ID ${headerAccessor.sessionId} subscribed.")
 
         // messagingTemplate.convertAndSend( "/topic/responses", "The doctor is in." );
         // messagingTemplate.convertAndSend( "/topic/responses", "What's on your mind?" );

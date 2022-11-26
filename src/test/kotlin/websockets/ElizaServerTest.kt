@@ -2,12 +2,28 @@
 package websockets
 
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito
-import org.springframework.amqp.rabbit.core.RabbitTemplate
+import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.*
-import org.springframework.stereotype.Component
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.lang.Nullable
+import org.springframework.messaging.converter.StringMessageConverter
+import org.springframework.messaging.simp.stomp.StompFrameHandler
+import org.springframework.messaging.simp.stomp.StompHeaders
+import org.springframework.messaging.simp.stomp.StompSession
+import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter
+import org.springframework.test.util.AssertionErrors.assertEquals
+import org.springframework.test.util.AssertionErrors.assertTrue
+import org.springframework.web.socket.client.standard.StandardWebSocketClient
+import org.springframework.web.socket.messaging.WebSocketStompClient
+import org.springframework.web.socket.sockjs.client.SockJsClient
+import org.springframework.web.socket.sockjs.client.Transport
+import org.springframework.web.socket.sockjs.client.WebSocketTransport
+import java.lang.reflect.Type
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.websocket.*
+
 
 /*
 @SpringBootTest(webEnvironment = RANDOM_PORT)
@@ -72,23 +88,48 @@ class ElizaOnOpenMessageHandlerToComplete(private val list: MutableList<String>,
 }
 */
 
-const val ELIZA_STOMP_ENDPOINT = "/app/eliza"
+const val ELIZA_STOMP_ENDPOINT = "gs-guide-websocket"
+const val ELIZA_ENDPOINT = "/app/eliza"
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 class ElizaServerTestStomp {
-    private lateinit var rabbitTemplateMock: RabbitTemplate
-    private lateinit var subject: MessageSender
+
+    @LocalServerPort
+    private val port: Int = 0
+
+    private lateinit var webSocketStompClient: WebSocketStompClient
 
     @BeforeEach
-    fun setUp() {
-        rabbitTemplateMock = Mockito.mock(RabbitTemplate::class.java)
-        subject = MessageSender(rabbitTemplateMock)
-    }
-}
+    fun setup() {
+        webSocketStompClient = WebSocketStompClient(
+            SockJsClient(
+                listOf<Transport>(WebSocketTransport(StandardWebSocketClient()))
+            )
+        )
 
-@Component
-class MessageSender(private val rabbitTemplate: RabbitTemplate) {
-    fun send(message: String) {
-        rabbitTemplate.convertAndSend(ELIZA_STOMP_ENDPOINT, message)
+        webSocketStompClient.messageConverter = StringMessageConverter()
     }
 
+    @Test
+    fun onChat() {
+        val latch = CountDownLatch(2)
+        val list = mutableListOf<String>()
+
+        val session: StompSession = webSocketStompClient
+            .connect("ws://localhost:$port/$ELIZA_STOMP_ENDPOINT", object : StompSessionHandlerAdapter() {})[1, TimeUnit.SECONDS]
+
+        session.subscribe("/topic/responses", object : StompFrameHandler {
+            override fun getPayloadType(headers: StompHeaders): Type {
+                return String::class.java
+            }
+
+            override fun handleFrame(headers: StompHeaders, @Nullable payload: Any?) {
+                list.add(payload as? String ?: throw Exception("No payload!"))
+            }
+        })
+
+        session.send(ELIZA_ENDPOINT, "maybe");
+        latch.await()
+        assertTrue("list should have 2 messages", list.size > 1)
+        assertEquals("Messages should be equal","You don't seem very certain.", list[0])
+    }
 }
